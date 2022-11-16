@@ -5,7 +5,7 @@ import asyncio
 import gui
 import time
 
-from listen_minechat import read_msgs
+from listen_minechat import read_msgs, save_messages, get_messages_queue
 
 
 def create_args_parser():
@@ -57,21 +57,17 @@ def create_args_parser():
     return parser
 
 
-async def generate_msgs(queue):
-    while True:
-        queue.put_nowait(f'Ping {time.time()}')
-        await asyncio.sleep(1)
-
-
 async def main():
     args_parser = create_args_parser()
     args = args_parser.parse_args()
-    messages_queue = asyncio.Queue()  # type: ignore
+    messages_queue = await get_messages_queue(args.history_path)
+    history_queue = asyncio.Queue()  # type: ignore
     sending_queue = asyncio.Queue()  # type: ignore
     status_updates_queue = asyncio.Queue()  # type: ignore
     await asyncio.gather(
         gui.draw(messages_queue, sending_queue, status_updates_queue),
-        read_msgs(args.host, args.listen_port, messages_queue)
+        read_msgs(args.host, args.listen_port, messages_queue, history_queue),
+        save_messages(args.history_path, history_queue)
     )
 
 if __name__ == '__main__':
