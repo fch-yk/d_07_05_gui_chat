@@ -51,23 +51,12 @@ def create_args_parser():
 async def authorize(reader, writer, token):
 
     response = await reader.readline()
-    logging.debug('response: %s', response.decode().strip())
-
     await submit_message(writer, token, 2)
-    logging.debug('submit: %s', token)
 
-    authorized = True
     response = await reader.readline()
-    decoded_response = response.decode().strip()
-    logging.debug('response: %s', decoded_response)
-    if not json.loads(decoded_response):
-        logging.debug(
-            'Unknown token: %s. Check it or register again.',
-            token
-        )
-        authorized = False
+    decoded_response = json.loads(response.decode().strip())
 
-    return authorized
+    return bool(decoded_response), decoded_response.get('nickname')
 
 
 async def send_msgs(host, send_port, sending_queue):

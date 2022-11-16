@@ -1,11 +1,13 @@
 
 import argparse
 import asyncio
+import json
+from pathlib import Path
 
 import gui
-
-from listen_minechat import read_msgs, save_messages, get_messages_queue
-from send_minechat import send_msgs
+from chat import get_connection
+from listen_minechat import get_messages_queue, read_msgs, save_messages
+from send_minechat import authorize, send_msgs
 
 
 def create_args_parser():
@@ -60,6 +62,19 @@ def create_args_parser():
 async def main():
     args_parser = create_args_parser()
     args = args_parser.parse_args()
+
+    if not Path(args.token_path).exists():
+        print('Invalid token file path: %s', args.token_path)
+        return
+
+    with open(args.token_path, 'r', encoding="UTF-8") as token_file:
+        token = json.load(token_file)['account_hash']
+
+    async with get_connection(args.host, args.send_port) as connection:
+        reader, writer = connection
+        authorized, nickname = await authorize(reader, writer, token)
+        print(f'Athorization completed: {authorized},  nickname: {nickname}')
+
     messages_queue = await get_messages_queue(args.history_path)
     history_queue = asyncio.Queue()  # type: ignore
     sending_queue = asyncio.Queue()  # type: ignore
