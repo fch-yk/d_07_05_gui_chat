@@ -70,21 +70,21 @@ async def main():
     with open(args.token_path, 'r', encoding="UTF-8") as token_file:
         token = json.load(token_file)['account_hash']
 
-    async with get_connection(args.host, args.send_port) as connection:
-        reader, writer = connection
+    async with get_connection(args.host, args.send_port) as (reader, writer):
         authorized, nickname = await authorize(reader, writer, token)
         print(f'Athorization completed: {authorized},  nickname: {nickname}')
 
-    messages_queue = await get_messages_queue(args.history_path)
-    history_queue = asyncio.Queue()  # type: ignore
-    sending_queue = asyncio.Queue()  # type: ignore
-    status_updates_queue = asyncio.Queue()  # type: ignore
-    await asyncio.gather(
-        gui.draw(messages_queue, sending_queue, status_updates_queue),
-        read_msgs(args.host, args.listen_port, messages_queue, history_queue),
-        save_messages(args.history_path, history_queue),
-        send_msgs(args.host, args.send_port, sending_queue)
-    )
+        messages_queue = await get_messages_queue(args.history_path)
+        history_queue = asyncio.Queue()  # type: ignore
+        sending_queue = asyncio.Queue()  # type: ignore
+        status_updates_queue = asyncio.Queue()  # type: ignore
+        await asyncio.gather(
+            gui.draw(messages_queue, sending_queue, status_updates_queue),
+            read_msgs(args.host, args.listen_port,
+                      messages_queue, history_queue),
+            save_messages(args.history_path, history_queue),
+            send_msgs(writer, sending_queue)
+        )
 
 if __name__ == '__main__':
     asyncio.run(main())
