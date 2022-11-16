@@ -70,6 +70,12 @@ async def authorize(reader, writer, token):
     return authorized
 
 
+async def send_msgs(host, send_port, sending_queue):
+    while True:
+        msg = await sending_queue.get()
+        print('The user wrote:', msg)
+
+
 async def main():
     env = Env()
     env.read_env()

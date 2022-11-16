@@ -3,9 +3,9 @@ import argparse
 import asyncio
 
 import gui
-import time
 
 from listen_minechat import read_msgs, save_messages, get_messages_queue
+from send_minechat import send_msgs
 
 
 def create_args_parser():
@@ -67,7 +67,8 @@ async def main():
     await asyncio.gather(
         gui.draw(messages_queue, sending_queue, status_updates_queue),
         read_msgs(args.host, args.listen_port, messages_queue, history_queue),
-        save_messages(args.history_path, history_queue)
+        save_messages(args.history_path, history_queue),
+        send_msgs(args.host, args.send_port, sending_queue)
     )
 
 if __name__ == '__main__':
