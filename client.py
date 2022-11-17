@@ -2,6 +2,8 @@
 import argparse
 import asyncio
 import json
+import logging
+import time
 
 import gui
 from listen_minechat import get_messages_queue, read_msgs, save_messages
@@ -57,6 +59,13 @@ def create_args_parser():
     return parser
 
 
+async def watch_for_connection(queues):
+    while True:
+        line = await queues['watchdog_queue'].get()
+        logger = logging.getLogger("watchdog_logger")
+        logger.debug('[%s] %s', time.time(), line)
+
+
 async def main():
     args_parser = create_args_parser()
     args = args_parser.parse_args()
@@ -64,11 +73,15 @@ async def main():
     with open(args.token_path, 'r', encoding="UTF-8") as token_file:
         token = json.load(token_file)['account_hash']
 
+    if args.debug_mode:
+        logging.basicConfig(level=logging.DEBUG)
+
     queues = {
         'messages_queue': await get_messages_queue(args.history_path),
         'history_queue': asyncio.Queue(),  # type: ignore
         'sending_queue': asyncio.Queue(),  # type: ignore
         'status_updates_queue': asyncio.Queue(),  # type: ignore
+        'watchdog_queue': asyncio.Queue(),  # type: ignore
     }
 
     await asyncio.gather(
@@ -76,6 +89,7 @@ async def main():
         read_msgs(args.host, args.listen_port, queues),
         save_messages(args.history_path, queues),
         send_msgs(args.host, args.send_port, token, queues),
+        watch_for_connection(queues)
     )
 
 if __name__ == '__main__':
