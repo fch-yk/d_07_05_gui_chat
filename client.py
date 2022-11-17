@@ -5,9 +5,8 @@ import json
 from pathlib import Path
 
 import gui
-from chat import get_connection
 from listen_minechat import get_messages_queue, read_msgs, save_messages
-from send_minechat import authorize, send_msgs
+from send_minechat import InvalidToken, send_msgs
 
 
 def create_args_parser():
@@ -63,28 +62,23 @@ async def main():
     args_parser = create_args_parser()
     args = args_parser.parse_args()
 
-    if not Path(args.token_path).exists():
-        print('Invalid token file path: %s', args.token_path)
-        return
-
     with open(args.token_path, 'r', encoding="UTF-8") as token_file:
         token = json.load(token_file)['account_hash']
 
-    async with get_connection(args.host, args.send_port) as (reader, writer):
-        authorized, nickname = await authorize(reader, writer, token)
-        print(f'Athorization completed: {authorized},  nickname: {nickname}')
-
-        messages_queue = await get_messages_queue(args.history_path)
-        history_queue = asyncio.Queue()  # type: ignore
-        sending_queue = asyncio.Queue()  # type: ignore
-        status_updates_queue = asyncio.Queue()  # type: ignore
-        await asyncio.gather(
-            gui.draw(messages_queue, sending_queue, status_updates_queue),
-            read_msgs(args.host, args.listen_port,
-                      messages_queue, history_queue),
-            save_messages(args.history_path, history_queue),
-            send_msgs(writer, sending_queue)
-        )
+    messages_queue = await get_messages_queue(args.history_path)
+    history_queue = asyncio.Queue()  # type: ignore
+    sending_queue = asyncio.Queue()  # type: ignore
+    status_updates_queue = asyncio.Queue()  # type: ignore
+    await asyncio.gather(
+        gui.draw(messages_queue, sending_queue, status_updates_queue),
+        read_msgs(args.host, args.listen_port,
+                  messages_queue, history_queue),
+        save_messages(args.history_path, history_queue),
+        send_msgs(args.host, args.send_port, sending_queue, token)
+    )
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except InvalidToken:
+        gui.show_invalid_token_message()

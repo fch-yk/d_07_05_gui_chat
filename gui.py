@@ -1,7 +1,8 @@
-import tkinter as tk
 import asyncio
-from tkinter.scrolledtext import ScrolledText
+import tkinter as tk
 from enum import Enum
+from tkinter import messagebox
+from tkinter.scrolledtext import ScrolledText
 
 
 class TkAppClosed(Exception):
@@ -103,9 +104,14 @@ def create_status_panel(root_frame):
     return (nickname_label, status_read_label, status_write_label)
 
 
+def show_invalid_token_message():
+    messagebox.showerror('Incorrect token',
+                         'Check the token, the server did not recognized it.'
+                         )
+
+
 async def draw(messages_queue, sending_queue, status_updates_queue):
     root = tk.Tk()
-
     root.title('Чат Майнкрафтера')
 
     root_frame = tk.Frame()
