@@ -7,6 +7,7 @@ from pathlib import Path
 import aiofiles
 
 from chat import get_connection
+from gui import ReadConnectionStateChanged
 
 
 async def get_messages_queue(history_path):
@@ -21,10 +22,10 @@ async def get_messages_queue(history_path):
     return messages_queue
 
 
-async def save_messages(file_path, history_queue):
+async def save_messages(file_path, queues):
     async with aiofiles.open(file_path, mode='a', encoding='utf-8') as file:
         while True:
-            history_line = await history_queue.get()
+            history_line = await queues['history_queue'].get()
             await file.write(f'{history_line}\n')
 
 
@@ -53,6 +54,12 @@ async def read_chat(reader, messages_queue, history_queue):
 
 
 @reconnect
-async def read_msgs(host, port, messages_queue, history_queue):
+async def read_msgs(host, port, queues):
     async with get_connection(host, port) as (reader, _):
-        await read_chat(reader,  messages_queue, history_queue)
+        event = ReadConnectionStateChanged.ESTABLISHED
+        queues['status_updates_queue'].put_nowait(event)
+        await read_chat(
+            reader,
+            queues['messages_queue'],
+            queues['history_queue']
+        )

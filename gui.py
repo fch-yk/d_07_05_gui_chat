@@ -110,7 +110,10 @@ def show_invalid_token_message():
                          )
 
 
-async def draw(messages_queue, sending_queue, status_updates_queue):
+async def draw(queues):
+    messages_queue = queues['messages_queue']
+    sending_queue = queues['sending_queue']
+    status_updates_queue = queues['status_updates_queue']
     root = tk.Tk()
     root.title('Чат Майнкрафтера')
 

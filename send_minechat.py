@@ -1,6 +1,7 @@
 import json
 
 from chat import submit_message, get_connection
+from gui import NicknameReceived, SendingConnectionStateChanged
 
 
 class InvalidToken(Exception):
@@ -21,10 +22,14 @@ async def authorize(reader, writer, token):
     return decoded_response['nickname']
 
 
-async def send_msgs(host, send_port, sending_queue, token):
+async def send_msgs(host, send_port, token, queues):
     async with get_connection(host, send_port) as (reader, writer):
+        event = SendingConnectionStateChanged.ESTABLISHED
+        queues['status_updates_queue'].put_nowait(event)
+
         nickname = await authorize(reader, writer, token)
-        print(f'nickname: {nickname}')
+        event = NicknameReceived(nickname)
+        queues['status_updates_queue'].put_nowait(event)
         while True:
-            msg = await sending_queue.get()
+            msg = await queues['sending_queue'].get()
             await submit_message(writer, msg, 2)
