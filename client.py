@@ -3,9 +3,14 @@ import argparse
 import asyncio
 import json
 import logging
+import socket
 import time
 
+from anyio import create_task_group, run
+from async_timeout import timeout
+
 import gui
+from chat import get_connections
 from listen_minechat import get_messages_queue, read_msgs, save_messages
 from send_minechat import InvalidToken, send_msgs
 
@@ -61,9 +66,56 @@ def create_args_parser():
 
 async def watch_for_connection(queues):
     while True:
-        line = await queues['watchdog_queue'].get()
-        logger = logging.getLogger("watchdog_logger")
-        logger.debug('[%s] %s', time.time(), line)
+        try:
+            async with timeout(1):
+                line = await queues['watchdog_queue'].get()
+                logger = logging.getLogger("watchdog_logger")
+                logger.debug('[%s] %s', time.time(), line)
+        except asyncio.exceptions.TimeoutError as timeout_error:
+            raise ConnectionError('Connection error') from timeout_error
+
+
+def reconnect(async_function):
+    async def wrap(args, token, queues):
+        while True:
+            try:
+                await async_function(args, token, queues)
+            except (ConnectionError, socket.gaierror) as fail:
+                logging.debug('Unable to connect: %s', fail)
+                set_connections_statuses('CLOSED', queues)
+                await asyncio.sleep(5)
+
+    return wrap
+
+
+def set_connections_statuses(status, queues):
+    states = (
+        gui.ReadConnectionStateChanged,
+        gui.SendingConnectionStateChanged
+    )
+    for state in states:
+        queues['status_updates_queue'].put_nowait(state[status])
+
+
+@reconnect
+async def handle_connection(args, token, queues):
+    set_connections_statuses('INITIATED', queues)
+    async with get_connections(
+        args.host,
+        args.listen_port,
+        args.send_port
+    ) as (listen_reader, _, send_reader, send_writer):
+        set_connections_statuses('ESTABLISHED', queues)
+        async with create_task_group() as task_group:
+            task_group.start_soon(read_msgs, listen_reader, queues)
+            task_group.start_soon(
+                send_msgs,
+                send_reader,
+                send_writer,
+                token,
+                queues
+            )
+            task_group.start_soon(watch_for_connection, queues)
 
 
 async def main():
@@ -84,16 +136,13 @@ async def main():
         'watchdog_queue': asyncio.Queue(),  # type: ignore
     }
 
-    await asyncio.gather(
-        gui.draw(queues),
-        read_msgs(args.host, args.listen_port, queues),
-        save_messages(args.history_path, queues),
-        send_msgs(args.host, args.send_port, token, queues),
-        watch_for_connection(queues)
-    )
+    async with create_task_group() as task_group:
+        task_group.start_soon(handle_connection, args, token, queues)
+        task_group.start_soon(gui.draw, queues)
+        task_group.start_soon(save_messages, args.history_path, queues)
 
 if __name__ == '__main__':
     try:
-        asyncio.run(main())
+        run(main)
     except InvalidToken:
         gui.show_invalid_token_message()
