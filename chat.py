@@ -2,6 +2,11 @@ import asyncio
 from contextlib import asynccontextmanager
 
 
+class InvalidToken(Exception):
+    def __str__(self):
+        return 'Check the token, the server did not recognize it'
+
+
 @asynccontextmanager
 async def get_connection(host, port):
     reader, writer = await asyncio.open_connection(

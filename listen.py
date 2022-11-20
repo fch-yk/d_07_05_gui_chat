@@ -1,13 +1,13 @@
 import asyncio
 import datetime
-from pathlib import Path
+import pathlib
 
 import aiofiles
 
 
 async def get_messages_queue(history_path):
     messages_queue = asyncio.Queue()  # type: ignore
-    if not Path(history_path).exists():
+    if not pathlib.Path(history_path).exists():
         return messages_queue
 
     async with aiofiles.open(history_path, mode='r', encoding='utf-8') as file:

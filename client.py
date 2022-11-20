@@ -6,13 +6,13 @@ import logging
 import socket
 import time
 
-from anyio import create_task_group, run
-from async_timeout import timeout
+import anyio
+import async_timeout
 
+import chat
 import gui
-from chat import get_connections
-from listen_minechat import get_messages_queue, read_msgs, save_messages
-from send_minechat import InvalidToken, send_msgs
+import listen
+import send
 
 
 def create_args_parser():
@@ -67,7 +67,7 @@ def create_args_parser():
 async def watch_for_connection(queues):
     while True:
         try:
-            async with timeout(1):
+            async with async_timeout.timeout(1):
                 line = await queues['watchdog_queue'].get()
                 logger = logging.getLogger("watchdog_logger")
                 logger.debug('[%s] %s', time.time(), line)
@@ -100,16 +100,16 @@ def set_connections_statuses(status, queues):
 @reconnect
 async def handle_connection(args, token, queues):
     set_connections_statuses('INITIATED', queues)
-    async with get_connections(
+    async with chat.get_connections(
         args.host,
         args.listen_port,
         args.send_port
     ) as (listen_reader, _, send_reader, send_writer):
         set_connections_statuses('ESTABLISHED', queues)
-        async with create_task_group() as task_group:
-            task_group.start_soon(read_msgs, listen_reader, queues)
+        async with anyio.create_task_group() as task_group:
+            task_group.start_soon(listen.read_msgs, listen_reader, queues)
             task_group.start_soon(
-                send_msgs,
+                send.send_msgs,
                 send_reader,
                 send_writer,
                 token,
@@ -129,20 +129,20 @@ async def main():
         logging.basicConfig(level=logging.DEBUG)
 
     queues = {
-        'messages_queue': await get_messages_queue(args.history_path),
+        'messages_queue': await listen.get_messages_queue(args.history_path),
         'history_queue': asyncio.Queue(),  # type: ignore
         'sending_queue': asyncio.Queue(),  # type: ignore
         'status_updates_queue': asyncio.Queue(),  # type: ignore
         'watchdog_queue': asyncio.Queue(),  # type: ignore
     }
 
-    async with create_task_group() as task_group:
+    async with anyio.create_task_group() as task_group:
         task_group.start_soon(handle_connection, args, token, queues)
         task_group.start_soon(gui.draw, queues)
-        task_group.start_soon(save_messages, args.history_path, queues)
+        task_group.start_soon(listen.save_messages, args.history_path, queues)
 
 if __name__ == '__main__':
     try:
-        run(main)
-    except InvalidToken:
+        anyio.run(main)
+    except chat.InvalidToken:
         gui.show_invalid_token_message()
