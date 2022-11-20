@@ -35,5 +35,5 @@ async def read_msgs(reader, queues):
         queues['messages_queue'].put_nowait(history_line)
         queues['history_queue'].put_nowait(history_line)
         queues['watchdog_queue'].put_nowait(
-            'Connection is alive. New message in chat'
+            'Connection is alive: new message in chat'
         )

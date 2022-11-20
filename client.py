@@ -77,11 +77,12 @@ async def watch_for_connection(queues):
 
 def reconnect(async_function):
     async def wrap(args, token, queues):
+        errors = (ConnectionError, socket.gaierror, anyio.ExceptionGroup)
         while True:
             try:
                 await async_function(args, token, queues)
-            except (ConnectionError, socket.gaierror) as fail:
-                logging.debug('Unable to connect: %s', fail)
+            except errors as error:
+                logging.debug('Unable to connect: %s', error)
                 set_connections_statuses('CLOSED', queues)
                 await asyncio.sleep(5)
 
@@ -95,6 +96,12 @@ def set_connections_statuses(status, queues):
     )
     for state in states:
         queues['status_updates_queue'].put_nowait(state[status])
+
+
+async def ping_send(queues):
+    while True:
+        queues['sending_queue'].put_nowait('')
+        await asyncio.sleep(0.5)
 
 
 @reconnect
@@ -116,6 +123,7 @@ async def handle_connection(args, token, queues):
                 queues
             )
             task_group.start_soon(watch_for_connection, queues)
+            task_group.start_soon(ping_send, queues)
 
 
 async def main():
