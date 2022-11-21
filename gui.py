@@ -4,6 +4,8 @@ from enum import Enum
 from tkinter import messagebox
 from tkinter.scrolledtext import ScrolledText
 
+import anyio
+
 
 class TkAppClosed(Exception):
     pass
@@ -42,9 +44,9 @@ async def update_tk(root_frame, interval=1 / 120):
     while True:
         try:
             root_frame.update()
-        except tk.TclError:
+        except tk.TclError as tcl_error:
             # if application has been destroyed/closed
-            raise TkAppClosed()
+            raise TkAppClosed() from tcl_error
         await asyncio.sleep(interval)
 
 
@@ -56,9 +58,6 @@ async def update_conversation_history(panel, messages_queue):
         if panel.index('end-1c') != '1.0':
             panel.insert('end', '\n')
         panel.insert('end', msg)
-        # TODO сделать промотку умной, чтобы не мешала просматривать историю сообщений
-        # ScrolledText.frame
-        # ScrolledText.vbar
         panel.yview(tk.END)
         panel['state'] = 'disabled'
 
@@ -66,9 +65,9 @@ async def update_conversation_history(panel, messages_queue):
 async def update_status_panel(status_labels, status_updates_queue):
     nickname_label, read_label, write_label = status_labels
 
-    read_label['text'] = f'Чтение: нет соединения'
-    write_label['text'] = f'Отправка: нет соединения'
-    nickname_label['text'] = f'Имя пользователя: неизвестно'
+    read_label['text'] = 'Чтение: нет соединения'
+    write_label['text'] = 'Отправка: нет соединения'
+    nickname_label['text'] = 'Имя пользователя: неизвестно'
 
     while True:
         msg = await status_updates_queue.get()
@@ -140,8 +139,15 @@ async def draw(queues):
     conversation_panel = ScrolledText(root_frame, wrap='none')
     conversation_panel.pack(side="top", fill="both", expand=True)
 
-    await asyncio.gather(
-        update_tk(root_frame),
-        update_conversation_history(conversation_panel, messages_queue),
-        update_status_panel(status_labels, status_updates_queue)
-    )
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(update_tk, root_frame)
+        task_group.start_soon(
+            update_conversation_history,
+            conversation_panel,
+            messages_queue
+        )
+        task_group.start_soon(
+            update_status_panel,
+            status_labels,
+            status_updates_queue
+        )
