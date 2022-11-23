@@ -4,8 +4,6 @@ from enum import Enum
 from tkinter import messagebox
 from tkinter.scrolledtext import ScrolledText
 
-import anyio
-
 
 class TkAppClosed(Exception):
     pass
@@ -105,7 +103,7 @@ def create_status_panel(root_frame):
 
 def show_invalid_token_message():
     messagebox.showerror('Incorrect token',
-                         'Check the token, the server did not recognized it.'
+                         'Check the token, the server did not recognize it.'
                          )
 
 
@@ -139,15 +137,11 @@ async def draw(queues):
     conversation_panel = ScrolledText(root_frame, wrap='none')
     conversation_panel.pack(side="top", fill="both", expand=True)
 
-    async with anyio.create_task_group() as task_group:
-        task_group.start_soon(update_tk, root_frame)
-        task_group.start_soon(
-            update_conversation_history,
-            conversation_panel,
-            messages_queue
+    async with asyncio.TaskGroup() as task_group:
+        task_group.create_task(update_tk(root_frame))
+        task_group.create_task(
+            update_conversation_history(conversation_panel, messages_queue)
         )
-        task_group.start_soon(
-            update_status_panel,
-            status_labels,
-            status_updates_queue
+        task_group.create_task(
+            update_status_panel(status_labels, status_updates_queue)
         )

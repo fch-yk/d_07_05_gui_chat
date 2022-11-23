@@ -5,9 +5,8 @@ import json
 import logging
 import socket
 import time
+import tkinter
 
-import anyio
-import async_timeout
 
 import chat
 import gui
@@ -67,25 +66,29 @@ def create_args_parser():
 async def watch_for_connection(queues):
     while True:
         try:
-            async with async_timeout.timeout(1):
+            async with asyncio.timeout(1):
                 line = await queues['watchdog_queue'].get()
                 logger = logging.getLogger("watchdog_logger")
                 logger.debug('[%s] %s', time.time(), line)
-        except asyncio.exceptions.TimeoutError as timeout_error:
+        except TimeoutError as timeout_error:
             raise ConnectionError('Connection error') from timeout_error
+
+
+async def process_connection_error(queues):
+    logging.debug('Unable to connect')
+    set_connections_statuses('CLOSED', queues)
+    await asyncio.sleep(5)
 
 
 def reconnect(async_function):
     async def wrap(args, token, queues):
-        errors = (ConnectionError, socket.gaierror, anyio.ExceptionGroup)
         while True:
             try:
                 await async_function(args, token, queues)
-            except errors as error:
-                logging.debug('Unable to connect: %s', error)
-                set_connections_statuses('CLOSED', queues)
-                await asyncio.sleep(5)
-
+            except* ConnectionError:
+                await process_connection_error(queues)
+            except* socket.gaierror:
+                await process_connection_error(queues)
     return wrap
 
 
@@ -113,17 +116,13 @@ async def handle_connection(args, token, queues):
         args.send_port
     ) as (listen_reader, _, send_reader, send_writer):
         set_connections_statuses('ESTABLISHED', queues)
-        async with anyio.create_task_group() as task_group:
-            task_group.start_soon(listen.read_msgs, listen_reader, queues)
-            task_group.start_soon(
-                send.send_msgs,
-                send_reader,
-                send_writer,
-                token,
-                queues
+        async with asyncio.TaskGroup() as task_group:
+            task_group.create_task(listen.read_msgs(listen_reader, queues))
+            task_group.create_task(
+                send.send_msgs(send_reader, send_writer, token, queues)
             )
-            task_group.start_soon(watch_for_connection, queues)
-            task_group.start_soon(ping_send, queues)
+            task_group.create_task(watch_for_connection(queues))
+            task_group.create_task(ping_send(queues))
 
 
 async def main():
@@ -144,13 +143,25 @@ async def main():
         'watchdog_queue': asyncio.Queue(),  # type: ignore
     }
 
-    async with anyio.create_task_group() as task_group:
-        task_group.start_soon(handle_connection, args, token, queues)
-        task_group.start_soon(gui.draw, queues)
-        task_group.start_soon(listen.save_messages, args.history_path, queues)
+    async with asyncio.TaskGroup() as task_group:
+        task_group.create_task(handle_connection(args, token, queues))
+        task_group.create_task(gui.draw(queues))
+        task_group.create_task(listen.save_messages(args.history_path, queues))
+
 
 if __name__ == '__main__':
     try:
-        anyio.run(main)
-    except chat.InvalidToken:
-        gui.show_invalid_token_message()
+        asyncio.run(main())
+    except* chat.InvalidToken:
+        log_text = 'Check the token, the server did not recognize it.'
+        tkinter.messagebox.showerror(
+            'Incorrect token',
+            log_text
+        )
+        logging.error(log_text)
+    except* KeyboardInterrupt:
+        logging.debug('Keyboard interrupt')
+    except* tkinter.TclError:
+        logging.debug('The chat console was closed')
+    except* asyncio.exceptions.CancelledError:
+        logging.debug('The chat was cancelled')
