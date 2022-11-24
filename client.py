@@ -1,4 +1,3 @@
-
 import argparse
 import asyncio
 import json
@@ -74,21 +73,15 @@ async def watch_for_connection(queues):
             raise ConnectionError('Connection error') from timeout_error
 
 
-async def process_connection_error(queues):
-    logging.debug('Unable to connect')
-    set_connections_statuses('CLOSED', queues)
-    await asyncio.sleep(5)
-
-
 def reconnect(async_function):
     async def wrap(args, token, queues):
         while True:
             try:
                 await async_function(args, token, queues)
-            except* ConnectionError:
-                await process_connection_error(queues)
-            except* socket.gaierror:
-                await process_connection_error(queues)
+            except* (ConnectionError, socket.gaierror):
+                logging.debug('Unable to connect')
+                set_connections_statuses('CLOSED', queues)
+                await asyncio.sleep(5)
     return wrap
 
 
@@ -159,9 +152,9 @@ if __name__ == '__main__':
             log_text
         )
         logging.error(log_text)
-    except* KeyboardInterrupt:
-        logging.debug('Keyboard interrupt')
-    except* tkinter.TclError:
-        logging.debug('The chat console was closed')
-    except* asyncio.exceptions.CancelledError:
-        logging.debug('The chat was cancelled')
+    except* (
+        KeyboardInterrupt,
+        tkinter.TclError,
+        asyncio.exceptions.CancelledError
+    ):
+        logging.debug('The chat was closed')

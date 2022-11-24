@@ -1,65 +1,25 @@
-import argparse
+
 import asyncio
 import logging
+import tkinter
+from tkinter import ttk
+from tkinter import messagebox
+import functools
 
-from environs import Env
-
-from chat import get_connection, submit_message
-
-
-def create_args_parser():
-    description = (
-        'The script registers the chat user: '
-        'it creates a token file, that contains your nickname and account hash'
-    )
-    parser = argparse.ArgumentParser(description=description)
-
-    parser.add_argument(
-        '--nickname',
-        metavar='{nickname}',
-        help='Your nickname in the chat (obligatory)',
-        required=True,
-    )
-
-    parser.add_argument(
-        '--debug_mode',
-        help='Turn on debug mode',
-        action="store_true",
-    )
-
-    parser.add_argument(
-        '--host',
-        metavar='{host}',
-        help='The chat host, minechat.dvmn.org by default',
-    )
-
-    parser.add_argument(
-        '--port',
-        metavar='{port}',
-        help='The chat port, 5050 by default',
-        type=int,
-    )
-
-    parser.add_argument(
-        '--token_path',
-        metavar='{token path}',
-        help='A path to a file to be created, token.json by default',
-    )
-
-    return parser
+import chat
 
 
 async def register(reader, writer, token_path, nickname):
     response = await reader.readline()
     logging.debug('response: %s', response.decode().strip())
 
-    await submit_message(writer, '', 1)
+    await chat.submit_message(writer, '', 1)
     logging.debug('submit: the token request')
 
     response = await reader.readline()
     logging.debug('response: %s', response.decode().strip())
 
-    await submit_message(writer, nickname, 1)
+    await chat.submit_message(writer, nickname, 1)
     logging.debug('submit: the nickname: %s', nickname)
 
     response = await reader.readline()
@@ -70,25 +30,72 @@ async def register(reader, writer, token_path, nickname):
         token_file.write(decoded_response)
 
 
-async def main():
-    env = Env()
-    env.read_env()
-    args_parser = create_args_parser()
-    args = args_parser.parse_args()
-    host = args.host or env('CHAT_HOST', 'minechat.dvmn.org')
-    port = args.port or env.int('SEND_PORT', 5050)
-    token_path = args.token_path or env('TOKEN_PATH', 'token.json')
-    debug_mode = args.debug_mode or env.bool('DEBUG_MODE', False)
-    if debug_mode:
+async def get_registered(nickname, host, port, token_path):
+    async with chat.get_connection(host, port) as (reader, writer):
+        await register(reader, writer, token_path, nickname)
+
+
+def click_register(entries, debug_mode):
+    nickname = entries['nickname'].get()
+    if not nickname:
+        messagebox.showerror('Error', 'Fill the nickname!')
+        return
+
+    if debug_mode.get():
         logging.basicConfig(
             level=logging.DEBUG,
             format='%(levelname)s [%(asctime)s]  %(message)s'
         )
+    asyncio.run(
+        get_registered(
+            entries['nickname'].get(),
+            entries['host'].get(),
+            int(entries['port'].get()),
+            entries['token_path'].get(),
+        )
+    )
+    messagebox.showinfo('Info', 'Registered!')
 
-    async with get_connection(host, port) as connection:
-        reader, writer = connection
-        await register(reader, writer, token_path, args.nickname)
+
+def set_entry(label_text, default=''):
+    frame = ttk.Frame(borderwidth=0, relief=tkinter.SOLID, padding=[8, 10])
+
+    label = ttk.Label(frame, text=label_text)
+    label.pack(anchor=tkinter.NW)
+
+    entry = ttk.Entry(frame)
+    entry.pack(anchor=tkinter.NW, expand=True, fill=tkinter.X)
+    entry.insert(0, default)
+
+    frame.pack(anchor=tkinter.NW, fill=tkinter.X, padx=5, pady=5)
+    return entry
+
+
+def main():
+    root = tkinter.Tk()
+    root.title('Register in the chat')
+    root.geometry('300x400+300+300')
+
+    entries = {
+        'nickname': set_entry('Nickname:'),
+        'host': set_entry('Host:', 'minechat.dvmn.org'),
+        'port': set_entry('Port:', '5050'),
+        'token_path': set_entry('Token path:', 'token.json'),
+    }
+    debug_mode = tkinter.IntVar()
+    debug_checkbutton = ttk.Checkbutton(text="Debug mode", variable=debug_mode)
+    debug_checkbutton.pack(padx=6, pady=6, anchor=tkinter.NW)
+
+    click_handler = functools.partial(
+        click_register,
+        entries=entries,
+        debug_mode=debug_mode,
+    )
+    btn = ttk.Button(text='Register', command=click_handler)
+    btn.pack(side=tkinter.BOTTOM, fill=tkinter.X)
+
+    root.mainloop()
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()
