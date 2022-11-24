@@ -1,10 +1,9 @@
 
 import asyncio
+import functools
 import logging
 import tkinter
-from tkinter import ttk
-from tkinter import messagebox
-import functools
+from tkinter import messagebox, ttk
 
 import chat
 

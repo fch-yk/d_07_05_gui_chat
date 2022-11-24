@@ -129,7 +129,7 @@ async def draw(queues):
         input_field, sending_queue))
 
     send_button = tk.Button(input_frame)
-    send_button["text"] = "Отправить"
+    send_button["text"] = "Send"
     send_button["command"] = lambda: process_new_message(
         input_field, sending_queue)
     send_button.pack(side="left")

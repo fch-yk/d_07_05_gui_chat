@@ -1,10 +1,10 @@
 # Secrete asynchronous chat
 
-The project scripts can work with TCP chat.
+The project scripts provide GUIs for the TCP chat.
 
 ## Prerequisites
 
-Python 3.10 is required.
+Python 3.11 is required.
 
 ## Installing
 
@@ -16,41 +16,35 @@ Python 3.10 is required.
 pip install -r requirements.txt
 ```
 
-- Set up environmental variables in your operating system or in .env file. The variables are:
-  - `DEBUG_MODE` is used to output logs, `False` by default;
-  - `CHAT_HOST` is a hostname, `minechat.dvmn.org` by default;
-  - `LISTEN_PORT` is a port to listen the chat, `5000` by default;
-  - `LISTEN_FILE` is a file path to write down the chat history, `history.txt` by default;
-  - `SEND_PORT` is a port to send a message or authorization data, `5050` by default;
-  - `TOKEN_PATH` is a file path to your authorization token, `token.json` by default.
-
-To set up variables in .env file, create it in the root directory of the project and fill it up like this:
-
-```bash
-CHAT_HOST=minechat.dvmn.org
-LISTEN_PORT=5000
-LISTEN_FILE=history.txt
-SEND_PORT=5050
-TOKEN_PATH=token.json
-DEBUG_MODE=true
-```
-
 ## Using scripts
 
-### Script "listen-minechat"
+### Script "register"
 
-- The script can write the chat history to a file;
+- The script can register a new chat user. It creates a *.json file with a token.
+- Run:
+
+```bash
+python register.py
+```
+
+- Set the nickname, the host, the port, the token path, the debug mode. Then click the "Register" button:
+
+![register window](./images/register_window.png)
+
+### Script "client"
+
+- The script saves the chat messages into a *.txt file and provides a graphical user interface to interact with the chat;
 
 - Run:
 
 ```bash
-python listen-minechat.py
+python client.py
 ```
 
-- You can specify debug mode, host, port, history file path, e.g.:
+- You can specify debug mode, host, listen port, send port, token path, history path, e.g.:
 
 ```bash
-python listen-minechat.py --debug_mode --host minechat.dvmn.org --port 5000 --file_path chat_history.txt
+python client.py --debug_mode --host minechat.dvmn.org --listen_port 5000 --send_port 5050 --history_path chat_history.txt
 ```
 
 - To find out more, run:
@@ -59,47 +53,9 @@ python listen-minechat.py --debug_mode --host minechat.dvmn.org --port 5000 --fi
 python listen-minechat.py -h
 ```
 
-### Script "register"
+- You can see all messages in the chat and send your message using the "Send" button.
 
-- The script can register a new chat user. It creates a *.json file with a token.
-- Run:
-
-```bash
-python register.py --nickname my_best_name
-```
-
-- You can specify debug mode, host, port, token path, e.g.:
-
-```bash
-python register.py --nickname my_best_name --debug_mode --host minechat.dvmn.org --port 5050 --token_path my_token.json
-```
-
-- To find out more, run:
-
-```bash
-python register.py -h
-```
-
-### Script "send-minechat"
-
-- The script can send a message to the chat. It uses a *.json file with a token (see [Script "register"](#script-register))
-- Run:
-
-```bash
-python send-minechat.py --message 'Hello, everybody!'
-```
-
-- You can specify debug mode, host, port, token path, e.g.:
-
-```bash
-python send-minechat.py --message 'Hello, everybody!' --debug_mode --host minechat.dvmn.org --port 5050 --token_path my_token.json
-```
-
-- To find out more, run:
-
-```bash
-python send-minechat.py -h
-```
+![client window](images/client_window.png)
 
 ## Project goals
 

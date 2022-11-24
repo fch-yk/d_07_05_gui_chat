@@ -1,8 +1,8 @@
 import json
 
-from chat import submit_message
-import gui
 import chat
+import gui
+from chat import submit_message
 
 
 async def authorize(reader, writer, token, queues):

@@ -6,7 +6,6 @@ import socket
 import time
 import tkinter
 
-
 import chat
 import gui
 import listen
