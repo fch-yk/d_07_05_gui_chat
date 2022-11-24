@@ -47,7 +47,7 @@ def click_register(entries, debug_mode):
         )
     asyncio.run(
         get_registered(
-            entries['nickname'].get(),
+            nickname,
             entries['host'].get(),
             int(entries['port'].get()),
             entries['token_path'].get(),
